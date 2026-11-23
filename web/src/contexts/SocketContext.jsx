@@ -13,6 +13,11 @@ export function SocketProvider({ children }) {
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
+    if (!SOCKET_URL || SOCKET_URL.trim() === '') {
+      setConnected(false);
+      return;
+    }
+
     let s;
     try {
       s = io(SOCKET_URL, {

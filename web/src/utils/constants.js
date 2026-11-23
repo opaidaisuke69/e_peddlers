@@ -1,5 +1,14 @@
-export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
-export const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
+const isBrowser = typeof window !== 'undefined';
+const isRemoteHost = isBrowser && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+
+export const API_BASE_URL =
+  import.meta.env.VITE_API_URL ||
+  (isRemoteHost ? `${window.location.origin}/api` : 'http://localhost:8000/api');
+
+export const SOCKET_URL =
+  import.meta.env.VITE_SOCKET_URL !== undefined
+    ? import.meta.env.VITE_SOCKET_URL
+    : (isRemoteHost ? '' : 'http://localhost:3001');
 
 export const APP_STATUS_CONFIG = {
   PENDING_ADMIN_APPROVAL: {
