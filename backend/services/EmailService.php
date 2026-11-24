@@ -4,7 +4,7 @@
  */
 
 class EmailService {
-    private static function getBaseTemplate(string $title, string $bodyContent): string {
+    public static function getBaseTemplate(string $title, string $bodyContent): string {
         return <<<HTML
 <!DOCTYPE html>
 <html lang="en">
@@ -153,18 +153,27 @@ HTML;
             return false;
         }
 
+        $encodedSubject = function_exists('mb_encode_mimeheader')
+            ? mb_encode_mimeheader($subject, 'UTF-8', 'B', "\r\n")
+            : "=?UTF-8?B?" . base64_encode($subject) . "?=";
+
+        // Base64-encode body and split into RFC-compliant 76-character lines.
+        // Prevents SMTP servers (Exim/Postfix) from rejecting messages with "lines too long for transport (limit 2048)".
+        $encodedBody = rtrim(chunk_split(base64_encode($htmlBody), 76, "\r\n"));
+
         $headers = [
             "MIME-Version: 1.0",
             "Content-Type: text/html; charset=UTF-8",
+            "Content-Transfer-Encoding: base64",
             "From: {$fromName} <{$from}>",
             "To: <{$to}>",
-            "Subject: =?UTF-8?B?" . base64_encode($subject) . "?=",
+            "Subject: {$encodedSubject}",
             "Date: " . date('r'),
             "X-Mailer: e-Peddlers Mailer"
         ];
 
-        $payload = implode("\r\n", $headers) . "\r\n\r\n" . $htmlBody . "\r\n.\r\n";
-        $write($payload);
+        fputs($socket, implode("\r\n", $headers) . "\r\n\r\n");
+        fputs($socket, $encodedBody . "\r\n.\r\n");
         $finalResp = $read();
 
         $write("QUIT");
@@ -184,6 +193,11 @@ HTML;
         $config = require dirname(__DIR__) . '/config/config.php';
         $smtpConfig = $config['smtp'] ?? [];
         $smtpEnabled = !empty($smtpConfig['enabled']) && !empty($smtpConfig['user']);
+
+        // Wrap bare snippet inside official template if not already a full HTML document
+        if (stripos($htmlBody, '<html') === false) {
+            $htmlBody = self::getBaseTemplate($subject, $htmlBody);
+        }
 
         $status = 'SENT';
         $errorMessage = null;
